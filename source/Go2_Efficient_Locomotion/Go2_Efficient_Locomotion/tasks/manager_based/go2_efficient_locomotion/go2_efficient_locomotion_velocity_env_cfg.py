@@ -17,7 +17,7 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
-from go2_efficient_locomotion.assets.robot.unitree import UNITREE_GO2_CFG as RobotCfg
+from Go2_Efficient_Locomotion.assets.robot.unitree import UNITREE_GO2_CFG as RobotCfg
 import isaaclab.envs.mdp as mdp
 
 @configclass
@@ -108,7 +108,7 @@ class ObservationsCfg:
 @configclass
 class ActionsCfg:
     JointPositionAction = mdp.JointPositionActionCfg(
-        asset_name="robot", joint_names=[".*"], scale=0.25, use_defaut_offset=True, clip={".*": (-100.0, 100.0)}
+        asset_name="robot", joint_names=[".*"], scale=0.25, use_default_offset=True, clip={".*": (-100.0, 100.0)}
     )
 
 @configclass

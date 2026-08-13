@@ -20,8 +20,8 @@ UNITREE_GO2_CFG = ArticulationCfg(
             max_angular_velocity=1000.0,
             max_depenetration_velocity=1.0,
         ),
-        articulation_props=sim_utils.ArticulationPropertiesCfg(
-            enable_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=False, solver_position_iteration_count=4, solver_velocity_iteration_count=0
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
@@ -38,10 +38,10 @@ UNITREE_GO2_CFG = ArticulationCfg(
     soft_joint_pos_limit_factor=0.9,
     actuators={
         "legs": DCMotorCfg(
-            joint_names=[".*"],
-            effort_limits=23.5,
-            saturation_torque=23.5,
-            velocity_limits=30.0,
+            joint_names_expr=[".*"],
+            effort_limit=23.5,
+            saturation_effort=23.5,
+            velocity_limit=30.0,
             stiffness=25.0,
             damping=0.5,
             friction=0.0,
