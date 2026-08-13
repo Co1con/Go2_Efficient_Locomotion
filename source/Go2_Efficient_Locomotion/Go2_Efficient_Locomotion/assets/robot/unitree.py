@@ -5,7 +5,7 @@ from isaaclab.actuators import IdealPDActuatorCfg, ImplicitActuatorCfg, DCMotorC
 from isaaclab.assets.articulation import ArticulationCfg
 from isaaclab.utils import configclass
 
-UNITREE_MODEL_DIR = "source/Go2_Efficient_Locomotion/Go2_Efficient_Locomotion/tasks/manager_based/go2_efficient_locomotion/assets/robot/unitree_model"
+UNITREE_MODEL_DIR = "source/Go2_Efficient_Locomotion/Go2_Efficient_Locomotion/assets/robot/unitree_model"
 
 UNITREE_GO2_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
