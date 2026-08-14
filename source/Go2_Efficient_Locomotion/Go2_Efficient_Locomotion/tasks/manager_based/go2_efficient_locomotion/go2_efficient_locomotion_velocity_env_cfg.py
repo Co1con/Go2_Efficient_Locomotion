@@ -58,7 +58,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         # 机体根部线速度
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1), clip=(-100.0, 100.0), scale=1)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1), clip=(-100.0, 100.0), scale=1.5)
         # 机体根部角速度
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), clip=(-100.0, 100.0), scale=0.2)
         # 重力方向在机器人根坐标系下的投影
@@ -130,11 +130,31 @@ class CommandsCfg:
 @configclass
 class RewardsCfg:
     track_lin_vel_xy = RewTerm(
-        func=mdp.track_lin_vel_xy_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_lin_vel_xy_exp, weight=5.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
     track_ang_vel_z = RewTerm(
-        func=mdp.track_ang_vel_z_exp, weight=0.75, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_ang_vel_z_exp, weight=3.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
+    # 约束机身姿态
+    flat_orientation = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)
+    # 限制原本不该着地的身体部位碰地
+    undesired_contacts = RewTerm(
+        func=mdp.undesired_contacts,
+        weight=-1,
+        params={
+            "threshold": 1.0,
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["Head_.*", ".*_hip", ".*_thigh", ".*_calf"])
+        },
+    )
+    # 惩罚关节速度
+    joint_vel = RewTerm(func=mdp.joint_vel_l2, weight=-0.0001)
+    # 惩罚关节加速度
+    joint_acc = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
+    # 惩罚关节输出力矩过大
+    joint_torques = RewTerm(func=mdp.joint_torques_l2, weight=-2e-4)
+    # 惩罚相邻时刻动作变化过大
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+
 @configclass
 class TerminationsCfg:
     # 训练时间到了
@@ -145,7 +165,7 @@ class TerminationsCfg:
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 1.0},
     )
     # 机器人倾斜太厉害，超过配置的阈值0.8
-    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"threshold": 0.8})
+    bad_orientation = DoneTerm(func=mdp.bad_orientation, params={"limit_angle": 0.8})
 @configclass
 class EventCfg:
     reset_base = EventTerm(
