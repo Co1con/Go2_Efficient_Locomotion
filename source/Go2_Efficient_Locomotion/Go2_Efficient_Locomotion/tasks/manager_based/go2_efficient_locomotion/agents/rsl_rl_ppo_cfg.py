@@ -59,7 +59,7 @@ class DistillationRunnerCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 3000
     save_interval = 100
-    experiment_name = "go2_demo"
+    experiment_name = "go2_efficient_locomotion_velocity"
     obs_groups = {
         "policy": ["student"],
         "teacher": ["policy"],
@@ -93,7 +93,7 @@ class StudentFinetuneRunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 1000
     save_interval = 100
-    experiment_name = "go2_demo"
+    experiment_name = "go2_efficient_locomotion_velocity"
     obs_groups = {
         "policy": ["student"],
         "critic": ["critic"],
