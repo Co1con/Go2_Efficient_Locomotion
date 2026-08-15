@@ -9,3 +9,4 @@ from isaaclab.utils import configclass
 @configclass
 class UniformLevelVelocityCommandCfg(UniformVelocityCommandCfg):
     limit_ranges: UniformVelocityCommandCfg.Ranges = MISSING
+    
