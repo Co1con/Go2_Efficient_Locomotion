@@ -7,7 +7,6 @@ from isaaclab.utils import configclass
 
 from isaaclab_rl.rsl_rl import (
     RslRlDistillationAlgorithmCfg,
-    RslRlDistillationRunnerCfg,
     RslRlDistillationStudentTeacherRecurrentCfg,
     RslRlOnPolicyRunnerCfg,
     RslRlPpoActorCriticCfg,
@@ -53,13 +52,13 @@ class PPORunnerCfg(RslRlOnPolicyRunnerCfg):
 
 
 @configclass
-class DistillationRunnerCfg(RslRlDistillationRunnerCfg):
+class DistillationRunnerCfg(RslRlOnPolicyRunnerCfg):
     """Distill the full-observation teacher into a recurrent deployable student."""
 
     num_steps_per_env = 24
     max_iterations = 3000
     save_interval = 100
-    experiment_name = "go2_demo"
+    experiment_name = "go2_efficient_locomotion_velocity"
     obs_groups = {
         "policy": ["student"],
         "teacher": ["policy"],
@@ -83,7 +82,6 @@ class DistillationRunnerCfg(RslRlDistillationRunnerCfg):
         learning_rate=1.0e-3,
         gradient_length=24,
         max_grad_norm=1.0,
-        loss_type="huber",
     )
 
 @configclass
@@ -93,7 +91,7 @@ class StudentFinetuneRunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 1000
     save_interval = 100
-    experiment_name = "go2_demo"
+    experiment_name = "go2_efficient_locomotion_velocity"
     obs_groups = {
         "policy": ["student"],
         "critic": ["critic"],
