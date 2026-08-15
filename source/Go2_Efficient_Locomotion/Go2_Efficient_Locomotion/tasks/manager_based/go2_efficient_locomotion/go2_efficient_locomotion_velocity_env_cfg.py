@@ -102,6 +102,7 @@ class RobotSceneCfg(InteractiveSceneCfg):
     #     ),
     #     debug_vis=False,
     # )
+    # 复杂随机地形
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
         terrain_type="generator",  # "plane", "generator"
@@ -412,9 +413,7 @@ class EventCfg:
 
 @configclass
 class CurriculumCfg:
-    # lin_vel_cmd_levels = CurrTerm(
-    #     func=mdp.lin_vel_cmd_levels
-    # )
+    # lin_vel_cmd_levels = CurrTerm(func=mdp.lin_vel_cmd_levels)
     terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
 @configclass
