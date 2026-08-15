@@ -108,7 +108,6 @@ class RobotSceneCfg(InteractiveSceneCfg):
         terrain_type="generator",  # "plane", "generator"
         terrain_generator=COBBLESTONE_ROAD_CFG,  # None, ROUGH_TERRAINS_CFG
         max_init_terrain_level=0,
-        use_terrain_origins = True,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
