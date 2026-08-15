@@ -31,7 +31,7 @@ class AERRewardManager(RewardManager):
         return self._reward_buf
 
 class AERManagerBasedRLEnv(ManagerBasedRLEnv):
-     def load_managers(self):
+    def load_managers(self):
         # note: this order is important since observation manager needs to know the command and action managers
         # and the reward manager needs to know the termination manager
         # -- command manager

@@ -1,6 +1,7 @@
 import math
 
 import isaaclab.sim as sim_utils
+import isaaclab.terrains as terrain_gen
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
@@ -20,18 +21,104 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 from Go2_Efficient_Locomotion.assets.robot.unitree import UNITREE_GO2_CFG as RobotCfg
 from Go2_Efficient_Locomotion.tasks.manager_based.go2_efficient_locomotion import mdp
 
+COBBLESTONE_ROAD_CFG = terrain_gen.TerrainGeneratorCfg(
+    size=(8.0, 8.0),
+    border_width=20.0,
+    num_rows=10,
+    num_cols=20,
+    horizontal_scale=0.1,
+    vertical_scale=0.005,
+    slope_threshold=None,
+    difficulty_range=(0.0, 1.0),
+    use_cache=False,
+    sub_terrains={
+        "flat": terrain_gen.MeshPlaneTerrainCfg(proportion=0.20),
+        # 原项目 smooth slope 共 10%，内部包含正反坡
+        "smooth_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
+            proportion=0.05,
+            slope_range=(0.0, 0.04),
+            platform_width=3.0,
+            border_width=0.25,
+        ),
+        "smooth_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
+            proportion=0.05,
+            slope_range=(0.0, 0.04),
+            platform_width=3.0,
+            border_width=0.25,
+        ),
+
+        # 近似原项目 rough slope
+        # 原项目实际是 slope + random rough 的叠加，内置配置无法直接组合
+        "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
+            proportion=0.15,
+            noise_range=(0.0, 0.05),
+            noise_step=0.005,
+            downsampled_scale=0.2,
+            border_width=0.25,
+        ),
+
+        # 原项目楼梯比例：35% / 25%
+        "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
+            proportion=0.20,
+            step_height_range=(0.05, 0.07),
+            step_width=0.31,
+            platform_width=3.0,
+            border_width=1.0,
+            holes=False,
+        ),
+        "pyramid_stairs_inv": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
+            proportion=0.15,
+            step_height_range=(0.05, 0.07),
+            step_width=0.31,
+            platform_width=3.0,
+            border_width=1.0,
+            holes=False,
+        ),
+
+        # 对齐原项目 discrete obstacles，而不是密集砖缝 boxes
+        "discrete_obstacles": terrain_gen.HfDiscreteObstaclesTerrainCfg(
+            proportion=0.20,
+            obstacle_height_mode="choice",
+            obstacle_width_range=(1.0, 2.0),
+            obstacle_height_range=(0.05, 0.07),
+            num_obstacles=20,
+            platform_width=3.0,
+            border_width=0.25,
+        ),
+    },
+)
 @configclass
 class RobotSceneCfg(InteractiveSceneCfg):
     # 超平坦地形
+    # terrain = TerrainImporterCfg(
+    #     prim_path="/World/ground",
+    #     terrain_type="plane",
+    #     collision_group=-1,
+    #     physics_material=sim_utils.RigidBodyMaterialCfg(
+    #         friction_combine_mode="multiply",
+    #         restitution_combine_mode="multiply",
+    #         static_friction=1.0,
+    #         dynamic_friction=1.0,
+    #     ),
+    #     debug_vis=False,
+    # )
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
-        terrain_type="plane",
+        terrain_type="generator",  # "plane", "generator"
+        terrain_generator=COBBLESTONE_ROAD_CFG,  # None, ROUGH_TERRAINS_CFG
+        max_init_terrain_level=0,
+        use_terrain_origins = True,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
             restitution_combine_mode="multiply",
             static_friction=1.0,
             dynamic_friction=1.0,
+        ),
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
+            project_uvw=True,
+            texture_scale=(0.25, 0.25),
         ),
         debug_vis=False,
     )
@@ -57,29 +144,29 @@ class RobotSceneCfg(InteractiveSceneCfg):
 class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
-        # 机体根部线速度
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1), clip=(-100.0, 100.0), scale=1.5)
-        # 机体根部角速度
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), clip=(-100.0, 100.0), scale=0.2)
-        # 重力方向在机器人根坐标系下的投影
+        # 机体根部线速度（坐标系：asset/root frame，也就是机器人根坐标系，不是世界坐标系）
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1), clip=(-100.0, 100.0), scale=1.0)
+        # 机体根部角速度（坐标系：asset/root frame）
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, scale=0.2, clip=(-100, 100), noise=Unoise(n_min=-0.2, n_max=0.2))
+        # 重力方向在机器人根坐标系下的投影（坐标系：asset/root frame）
         # 常用来表征机器人当前姿态，比如有没有侧倾、俯仰
-        projected_gravity = ObsTerm(func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05), clip=(-100.0, 100.0))
-        # 速度命令
-        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"}, clip=(-100.0, 100.0))
-        # 相对关节位置
+        projected_gravity = ObsTerm(func=mdp.projected_gravity, clip=(-100, 100), noise=Unoise(n_min=-0.05, n_max=0.05))
+        # 速度指令（由 command manager 生成）
+        velocity_commands = ObsTerm(func=mdp.generated_commands, clip=(-100, 100), params={"command_name": "base_velocity"})
+        # 相对关节位置（相对默认关节位置的偏差）
         joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel, clip=(-100, 100), noise=Unoise(n_min=-0.01, n_max=0.01))
-        # 相对关节速度
+        # 相对关节速度（相对默认关节速度的偏差）
         joint_vel_rel = ObsTerm(
             func=mdp.joint_vel_rel, scale=0.05, clip=(-100, 100), noise=Unoise(n_min=-1.5, n_max=1.5)
         )
-        # 关节输出力（力矩）
+        # 关节输出力 / 力矩（单位通常是 N 或 N·m）
         joint_effort = ObsTerm(func=mdp.joint_effort, scale=0.01, clip=(-100, 100))
         # 上一时刻的动作输出
-        # 一般就是上一拍策略的网络送给环境的 action，可用于提升控制平滑性或提供时序信息
+        # 一般就是上一拍策略网络送给环境的 action，可用于提升控制平滑性或提供时序信息
         last_action = ObsTerm(func=mdp.last_action, clip=(-100, 100))
-        # 高度扫描结果
+        # 高度扫描结果（坐标系：sensor frame，也就是 height_scanner 这个传感器自己的坐标系）
         # 本质上是传感器射线打到地面后得到的局部高度信息
-        # 这里的 sensor_cfg 指向在 scene 里定义好的 height_scanner 传感器
+        # 这里的 sensor_cfg 指向你在 scene 里定义好的 "height_scanner"
         height_scanner = ObsTerm(func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
             clip=(-1.0, 5.0),
@@ -89,11 +176,53 @@ class ObservationsCfg:
             self.enable_corruption = True
             self.concatenate_terms = True
     policy: PolicyCfg = PolicyCfg()
+
+    @configclass
+    class StudentCfg(ObsGroup):
+        """Deployable observations used by the recurrent student policy."""
+
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel,
+            scale=0.2,
+            clip=(-100, 100),
+            noise=Unoise(n_min=-0.2, n_max=0.2),
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            clip=(-100, 100),
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        velocity_commands = ObsTerm(
+            func=mdp.generated_commands,
+            clip=(-100, 100),
+            params={"command_name": "base_velocity"},
+        )
+        joint_pos_rel = ObsTerm(
+            func=mdp.joint_pos_rel,
+            clip=(-100, 100),
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+        joint_vel_rel = ObsTerm(
+            func=mdp.joint_vel_rel,
+            scale=0.05,
+            clip=(-100, 100),
+            noise=Unoise(n_min=-1.5, n_max=1.5),
+        )
+        joint_effort = ObsTerm(func=mdp.joint_effort, scale=0.01, clip=(-100, 100))
+        last_action = ObsTerm(func=mdp.last_action, clip=(-100, 100))
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    student: StudentCfg = StudentCfg()
+
     @configclass
     class CriticCfg(ObsGroup):
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2), clip=(-100.0, 100.0), scale=0.2)
-        projected_gravity = ObsTerm(func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05), clip=(-100.0, 100.0))
-        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"}, clip=(-100.0, 100.0))
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1), clip=(-100.0, 100.0), scale=1.0)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, scale=0.2, clip=(-100, 100), noise=Unoise(n_min=-0.2, n_max=0.2))
+        projected_gravity = ObsTerm(func=mdp.projected_gravity, clip=(-100, 100), noise=Unoise(n_min=-0.05, n_max=0.05))
+        velocity_commands = ObsTerm(func=mdp.generated_commands, clip=(-100, 100), params={"command_name": "base_velocity"})
         joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel, clip=(-100, 100), noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel_rel = ObsTerm(
             func=mdp.joint_vel_rel, scale=0.05, clip=(-100, 100), noise=Unoise(n_min=-1.5, n_max=1.5)
@@ -108,7 +237,15 @@ class ObservationsCfg:
 @configclass
 class ActionsCfg:
     JointPositionAction = mdp.JointPositionActionCfg(
-        asset_name="robot", joint_names=[".*"], scale=0.25, use_default_offset=True, clip={".*": (-100.0, 100.0)}
+        asset_name="robot",
+        joint_names=[".*"],
+        scale={
+            ".*_hip_joint": 0.125,
+            ".*_thigh_joint": 0.25,
+            ".*_calf_joint": 0.25,
+        },
+        use_default_offset=True,
+        clip={".*": (-100.0, 100.0)},
     )
 
 @configclass
@@ -129,30 +266,65 @@ class CommandsCfg:
 @configclass
 class RewardsCfg:
     track_lin_vel_xy = RewTerm(
-        func=mdp.track_lin_vel_xy_exp, weight=5.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_lin_vel_xy_exp, weight=1.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
     track_ang_vel_z = RewTerm(
-        func=mdp.track_ang_vel_z_exp, weight=3.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
-    # 约束机身姿态
-    flat_orientation = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)
-    # 限制原本不该着地的身体部位碰地
-    undesired_contacts = RewTerm(
-        func=mdp.undesired_contacts,
-        weight=-1,
+    energy_new_actual = RewTerm(
+        func=mdp.energy_new_actual,
+        weight=0.8,
         params={
-            "threshold": 1.0,
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["Head_.*", ".*_hip", ".*_thigh", ".*_calf"])
-        },
+                "asset_cfg": SceneEntityCfg("robot"),
+                # 这个数值是论文里面给的
+                "sigma_lin": 1000.0,
+                "sigma_ang": 500.0,
+                "clip_lin": 0.2,
+                "clip_ang": 0.2,
+            },
     )
+    base_linear_velocity = RewTerm(func=mdp.lin_vel_z_l2, weight=-0.05)
+    base_angular_velocity = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.001)
+    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-5.0)
+    # 限制原本不该着地的身体部位碰地
+
+    # 惩罚关节输出力矩过大
+    joint_torques = RewTerm(func=mdp.joint_torques_l2, weight=-1e-4)
     # 惩罚关节速度
-    joint_vel = RewTerm(func=mdp.joint_vel_l2, weight=-0.0001)
+    joint_vel = RewTerm(func=mdp.joint_vel_l2, weight=-1e-4)
     # 惩罚关节加速度
     joint_acc = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
-    # 惩罚关节输出力矩过大
-    joint_torques = RewTerm(func=mdp.joint_torques_l2, weight=-2e-4)
     # 惩罚相邻时刻动作变化过大
     action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+    action_smoothness_2 = RewTerm(func=mdp.action_smoothness_2, weight=-0.01)
+    feet_slip = RewTerm(
+        func=mdp.feet_slip,
+        weight=-0.04,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+        },
+    )
+    dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=-10.0)
+    # 限制那些本来不应该着地的身体部位不要乱碰?
+    undesired_contacts = RewTerm(
+        func=mdp.undesired_contacts,
+        weight=-5.0,
+        params={
+            "threshold": 1,
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*_thigh", ".*_calf"]),
+        },
+    )
+    base_height = RewTerm(
+        func=mdp.base_height_l2,
+        weight=-30.0,
+        params={
+            "target_height": 0.3,
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("height_scanner"),
+        },
+    )
+
 
 @configclass
 class TerminationsCfg:
@@ -182,12 +354,68 @@ class EventCfg:
             }
         }
     )
+    foot_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+            "static_friction_range": (0.6, 1.2),
+            "dynamic_friction_range": (0.6, 1.2),
+            "restitution_range": (0.0, 0.05),
+            "num_buckets": 64,
+        },
+    )
+
+    base_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "mass_distribution_params": (-1.0, 1.0),
+            "operation": "add",
+            "recompute_inertia": True,
+        },
+    )
+
+    base_com = EventTerm(
+        func=mdp.randomize_rigid_body_com,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "com_range": {
+                "x": (-0.02, 0.02),
+                "y": (-0.015, 0.015),
+                "z": (-0.01, 0.01),
+            },
+        },
+    )
+
+    actuator_gains = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+            "stiffness_distribution_params": (0.9, 1.1),
+            "damping_distribution_params": (0.9, 1.1),
+            "operation": "scale",
+        },
+    )
+    reset_robot_joints = EventTerm(
+        func=mdp.reset_joints_by_scale,
+        mode="reset",
+        params={
+            "position_range": (1.0, 1.0),
+            "velocity_range": (-0.5, 0.5),
+        },
+    )
+
 
 @configclass
 class CurriculumCfg:
-    lin_vel_cmd_levels = CurrTerm(
-        func=mdp.lin_vel_cmd_levels
-    )
+    # lin_vel_cmd_levels = CurrTerm(
+    #     func=mdp.lin_vel_cmd_levels
+    # )
+    terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
 @configclass
 class Go2EfficientLocomotionVelocityEnvCfg(ManagerBasedRLEnvCfg):
