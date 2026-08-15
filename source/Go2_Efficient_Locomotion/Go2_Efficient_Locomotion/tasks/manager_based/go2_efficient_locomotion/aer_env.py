@@ -18,7 +18,7 @@ class AERRewardManager(RewardManager):
                 self._step_reward[:, term_idx] = 0.0
                 continue
 
-            value = term_cfg.func(self.env, **term_cfg.params) * term_cfg.weight
+            value = term_cfg.func(self._env, **term_cfg.params) * term_cfg.weight
             self._episode_sums[name] += value * dt
             self._step_reward[:, term_idx] = value
 
