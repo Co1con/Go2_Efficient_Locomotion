@@ -24,3 +24,28 @@ def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneE
     joint_pos = wrap_to_pi(asset.data.joint_pos[:, asset_cfg.joint_ids])
     # compute the reward
     return torch.sum(torch.square(joint_pos - target), dim=1)
+
+def energy_new_actual(env, asset_cfg=SceneEntityCfg("robot"), sigma_lin=1000.0, sigma_ang=100.0, clip_lin=0.2, clip_ang=0.2):
+    asset = env.scene[asset_cfg.name]
+    # 关节速度
+    joint_vel = asset.data.joint_vel
+    # 关节力矩
+    joint_torque = asset.data.applied_torque
+    # 机身线速度和角速度
+    base_lin_vel_x = asset.data.root_lin_vel_b[:, 0]
+    base_ang_vel_z = asset.data.root_ang_vel_b[:, 2]
+    # 能量奖励分子部分
+    energy = torch.sum(torch.abs(joint_vel * joint_torque), dim=1)
+    # 能量奖励分母部分
+    denom = (
+        sigma_lin * torch.clamp(torch.abs(base_lin_vel_x), max=clip_lin) + 
+        sigma_ang * torch.clamp(torch.abs(base_ang_vel_z), max=clip_ang)
+    )
+    return torch.exp(-energy / denom)
+
+def feet_slip(env, sensor_cfg, asset_cfg=SceneEntityCfg("robot")):
+    contact_sensor = env.scene.sensors[sensor_cfg.name]
+    asset = env.scene[asset_cfg.name]
+    contacts = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.sensor_ids, :].norm(dim=-1)[0] > 1.0
+    feet_vel_xy = asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2]
+    return torch.sum(contacts * torch.sum(torch.square(feet_vel_xy), dim=-1), dim=1)

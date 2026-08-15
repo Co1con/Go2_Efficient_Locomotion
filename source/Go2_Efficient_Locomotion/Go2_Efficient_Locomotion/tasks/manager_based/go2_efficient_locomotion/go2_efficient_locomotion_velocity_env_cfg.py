@@ -1,5 +1,4 @@
 import math
-from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
@@ -17,8 +16,9 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+
 from Go2_Efficient_Locomotion.assets.robot.unitree import UNITREE_GO2_CFG as RobotCfg
-import isaaclab.envs.mdp as mdp
+from Go2_Efficient_Locomotion.tasks.manager_based.go2_efficient_locomotion import mdp
 
 @configclass
 class RobotSceneCfg(InteractiveSceneCfg):
@@ -183,6 +183,13 @@ class EventCfg:
             }
         }
     )
+
+@configclass
+class CurriculumCfg:
+    lin_vel_cmd_levels = CurrTerm(
+        func=mdp.lin_vel_cmd_levels
+    )
+
 @configclass
 class Go2EfficientLocomotionVelocityEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
@@ -196,7 +203,7 @@ class Go2EfficientLocomotionVelocityEnvCfg(ManagerBasedRLEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
     events: EventCfg = EventCfg()
-    # curriculum: CurriculumCfg = CurriculumCfg()
+    curriculum: CurriculumCfg = CurriculumCfg()
 
     def __post_init__(self):
         """Post initialization."""
