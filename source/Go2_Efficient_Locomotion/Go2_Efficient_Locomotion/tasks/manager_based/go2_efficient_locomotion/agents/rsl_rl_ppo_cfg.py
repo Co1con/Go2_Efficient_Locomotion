@@ -65,14 +65,11 @@ class DistillationRunnerCfg(RslRlOnPolicyRunnerCfg):
     }
     policy = RslRlDistillationStudentTeacherRecurrentCfg(
         init_noise_std=0.1,
-        student_obs_normalization=False,
-        teacher_obs_normalization=False,
+        noise_std_type="scalar",
         student_hidden_dims=[512, 256, 128],
         teacher_hidden_dims=[512, 256, 128],
         activation="elu",
         rnn_type="gru",
-        # The distillation implementation builds the non-recurrent teacher MLP with this width.
-        # Keep it equal to the teacher actor input width so teacher checkpoints load correctly.
         rnn_hidden_dim=247,
         rnn_num_layers=1,
         teacher_recurrent=False,
@@ -97,14 +94,13 @@ class StudentFinetuneRunnerCfg(RslRlOnPolicyRunnerCfg):
         "critic": ["critic"],
     }
     policy = RslRlPpoActorCriticRecurrentCfg(
-        init_noise_std=0.1,
-        actor_obs_normalization=False,
-        critic_obs_normalization=False,
+        init_noise_std=1.0,
+        noise_std_type="scalar",
         actor_hidden_dims=[512, 256, 128],
         critic_hidden_dims=[512, 256, 128],
         activation="elu",
         rnn_type="gru",
-        rnn_hidden_dim=247,
+        rnn_hidden_dim=256,
         rnn_num_layers=1,
     )
     algorithm = RslRlPpoAlgorithmCfg(
